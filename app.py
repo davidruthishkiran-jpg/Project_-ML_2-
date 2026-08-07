@@ -30,18 +30,23 @@ def data_loading():
         error=error,
     )
 @app.route("/eda")
-def eda_page():
-    error=None
-    results =None
+def eda():
+    """Runs exploratory data analysis and renders results."""
+    error = None
+    eda_output = None
     try:
-        results = run_eda()
+        eda_output = run_eda()   # call your EDA function
     except FileNotFoundError as e:
         error = str(e)
     except Exception as e:
         error = f"Unexpected error: {e}"
-        return render_template(
+
+    return render_template(
         "eda.html",
         active="eda",
-        )
+        results=eda_output,
+        error=error,
+    )
+
 if __name__ == "__main__":
     app.run(debug=True)

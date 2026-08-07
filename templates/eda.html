@@ -22,7 +22,7 @@
                 </a>
             </li>
             <li>
-                <a href="{{ url_for('eda_page') }}"
+                <a href="{{ url_for('eda') }}"
                    class="menu-item {% if active == 'eda' %}active{% endif %}">
                     EDA
                 </a>
@@ -72,13 +72,41 @@
             </table>
 
             <h3>Charts</h3>
-            <div class="chart-grid">
-                {% for fname in results.charts %}
-                <div class="chart-card">
-                    <img src="{{ url_for('static', filename='charts/' + fname) }}" alt="{{ fname }}">
-                </div>
+
+            {% set sections = [
+                ("Missing Values",          ["missing_values.png"]),
+                ("Target Distribution",     ["target_distribution.png"]),
+                ("Individual Distributions",["hist_cgpa.png","hist_attendancepercent.png","hist_aptitudetestscore.png","hist_softskillsrating.png"]),
+                ("All Numeric Features",    ["numeric_distributions.png"]),
+                ("CGPA with Mean",          ["cgpa_with_mean.png"]),
+                ("Outlier Boxplots",        ["boxplot_cgpa.png","boxplot_attendancepercent.png","boxplot_aptitudetestscore.png","boxplot_softskillsrating.png","boxplot_codingtestscore.png","boxplot_mockinterviewscore.png","boxplot_salary_package.png"]),
+                ("Correlation Heatmap",     ["correlation_heatmap.png"]),
+                ("Relationship Plots",      ["cgpa_vs_salary.png","aptitude_vs_coding.png"]),
+                ("Categorical Counts",      ["cat_gender.png","cat_city.png","cat_collegetier.png","cat_stream.png","cat_specialisation.png","cat_hostel.png","cat_historyofbacklogs.png","cat_cgpa_tier.png"]),
+                ("Placement Outcome",       ["gender_vs_placement.png","collegetier_vs_placement.png","stream_vs_placement.png"]),
+                ("SGPA Trend",              ["sgpa_trend.png"]),
+                ("Salary Analysis",         ["salary_distribution.png","salary_by_tier.png"]),
+                ("Pairplot",                ["pairplot.png"])
+            ] %}
+
+            {% for section_title, fnames in sections %}
+                {% set visible = [] %}
+                {% for fname in fnames %}
+                    {% if fname in results.charts %}
+                        {% set _ = visible.append(fname) %}
+                    {% endif %}
                 {% endfor %}
-            </div>
+                {% if visible %}
+                <h3>{{ section_title }}</h3>
+                <div class="chart-grid">
+                    {% for fname in visible %}
+                    <div class="chart-card">
+                        <img src="{{ url_for('static', filename='charts/' + fname) }}" alt="{{ fname }}">
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            {% endfor %}
         {% endif %}
     </main>
 </div>

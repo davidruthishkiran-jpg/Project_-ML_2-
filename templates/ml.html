@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Placement Prediction Project — ML Models</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="topbar">
+    <h1>Placement Prediction Project</h1>
+</header>
+
+<div class="layout">
+    <!-- Left panel -->
+    <nav class="sidebar">
+        <ul>
+            <li>
+                <a href="{{ url_for('data_loading') }}"
+                   class="menu-item {% if active == 'data-loading' %}active{% endif %}">
+                    Data Loading
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('eda') }}"
+                   class="menu-item {% if active == 'eda' %}active{% endif %}">
+                    EDA
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('ml_home') }}"
+                   class="menu-item {% if active == 'ml' %}active{% endif %}">
+                    ML Models
+                </a>
+            </li>
+            <li class="menu-item disabled">Prediction (coming soon)</li>
+        </ul>
+    </nav>
+
+    <!-- Main content -->
+    <main class="content">
+        <h2>Machine Learning Models</h2>
+        <p class="page-desc">
+            Select an algorithm below to train it on the placement dataset and view the output charts.
+            Each run saves charts to disk and displays them here — no page reload needed.
+        </p>
+
+        <!-- Algorithm buttons -->
+        <div class="ml-btn-group">
+
+            <div class="ml-section-label">M2 — Linear Models</div>
+
+            <a href="{{ url_for('ml_run', algo='linear_regression') }}"
+               class="ml-btn {% if algo == 'linear_regression' %}ml-btn-active{% endif %}">
+                <span class="ml-btn-icon">📈</span>
+                <span class="ml-btn-text">
+                    <strong>Linear Regression</strong>
+                    <small>Predict salary from academic features</small>
+                </span>
+            </a>
+
+            <a href="{{ url_for('ml_run', algo='logistic_regression') }}"
+               class="ml-btn {% if algo == 'logistic_regression' %}ml-btn-active{% endif %}">
+                <span class="ml-btn-icon">🔵</span>
+                <span class="ml-btn-text">
+                    <strong>Logistic Regression</strong>
+                    <small>Binary classification — placed / not placed</small>
+                </span>
+            </a>
+
+            <a href="{{ url_for('ml_run', algo='ridge_lasso') }}"
+               class="ml-btn {% if algo == 'ridge_lasso' %}ml-btn-active{% endif %}">
+                <span class="ml-btn-icon">⚖️</span>
+                <span class="ml-btn-text">
+                    <strong>Ridge, Lasso &amp; ElasticNet</strong>
+                    <small>Regularisation — L1 / L2 / mixed</small>
+                </span>
+            </a>
+
+            <div class="ml-section-label">M3 — Tree-Based Models</div>
+
+            <a href="{{ url_for('ml_run', algo='decision_tree') }}"
+               class="ml-btn {% if algo == 'decision_tree' %}ml-btn-active{% endif %}">
+                <span class="ml-btn-icon">🌿</span>
+                <span class="ml-btn-text">
+                    <strong>Decision Tree</strong>
+                    <small>Gini splits · bias-variance depth sweep</small>
+                </span>
+            </a>
+
+            <a href="{{ url_for('ml_run', algo='random_forest') }}"
+               class="ml-btn {% if algo == 'random_forest' %}ml-btn-active{% endif %}">
+                <span class="ml-btn-icon">🌲</span>
+                <span class="ml-btn-text">
+                    <strong>Random Forest</strong>
+                    <small>Bagging · OOB score · feature importance</small>
+                </span>
+            </a>
+
+            <a href="{{ url_for('ml_run', algo='xgboost') }}"
+               class="ml-btn {% if algo == 'xgboost' %}ml-btn-active{% endif %}">
+                <span class="ml-btn-icon">⚡</span>
+                <span class="ml-btn-text">
+                    <strong>XGBoost</strong>
+                    <small>Gradient boosting · training curve · ROC</small>
+                </span>
+            </a>
+
+            <div class="ml-section-label">M4 — Unsupervised Learning</div>
+
+            <a href="{{ url_for('ml_run', algo='kmeans') }}"
+               class="ml-btn {% if algo == 'kmeans' %}ml-btn-active{% endif %}">
+                <span class="ml-btn-icon">🔵</span>
+                <span class="ml-btn-text">
+                    <strong>K-Means Clustering</strong>
+                    <small>Elbow · silhouette · PCA scatter · profiles</small>
+                </span>
+            </a>
+
+            <div class="ml-section-label">Evaluation</div>
+
+            <a href="{{ url_for('ml_run', algo='model_comparison') }}"
+               class="ml-btn ml-btn-compare {% if algo == 'model_comparison' %}ml-btn-active{% endif %}">
+                <span class="ml-btn-icon">📊</span>
+                <span class="ml-btn-text">
+                    <strong>Model Comparison</strong>
+                    <small>5-fold CV · overlaid ROC curves · all classifiers</small>
+                </span>
+            </a>
+
+        </div>
+
+        <!-- Results area -->
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if result %}
+        <div class="ml-result">
+
+            <h3 class="ml-result-title">{{ result.title }}</h3>
+
+            <p class="ml-description">{{ result.description | safe }}</p>
+
+            <!-- Metrics pills -->
+            {% if result.metrics %}
+            <div class="ml-metrics">
+                {% for key, val in result.metrics.items() %}
+                <div class="metric-pill">
+                    <span class="metric-label">{{ key }}</span>
+                    <span class="metric-value">{{ val }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Charts -->
+            {% if result.charts %}
+            <h4 class="chart-section-title">Output Charts</h4>
+            <div class="chart-grid">
+                {% for fname in result.charts %}
+                <div class="chart-card">
+                    <p class="chart-label">{{ fname.replace('_', ' ').replace('.png', '').title() }}</p>
+                    <img src="{{ url_for('static', filename='charts/ml/' + fname) }}"
+                         alt="{{ fname }}">
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+        </div>
+        {% elif not error %}
+            <div class="ml-placeholder">
+                <p>👈 Pick an algorithm from the left to run it and see the charts here.</p>
+            </div>
+        {% endif %}
+
+    </main>
+</div>
+
+</body>
+</html>

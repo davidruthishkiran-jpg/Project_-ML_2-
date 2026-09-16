@@ -27,8 +27,12 @@
                     EDA
                 </a>
             </li>
-            <li class="menu-item disabled">Preprocessing (coming soon)</li>
-            <li class="menu-item disabled">Model Training (coming soon)</li>
+            <li>
+                <a href="{{ url_for('ml_home') }}"
+                   class="menu-item {% if active == 'ml' %}active{% endif %}">
+                    ML Models
+                </a>
+            </li>
             <li class="menu-item disabled">Prediction (coming soon)</li>
         </ul>
     </nav>

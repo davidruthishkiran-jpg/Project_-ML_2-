@@ -153,3 +153,165 @@ body {
     display: block;
 }
 
+
+
+/* ─────────────────────────────────────────────────────
+   ML Models page
+───────────────────────────────────────────────────── */
+
+.page-desc {
+    color: #555;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+/* Algorithm button group */
+.ml-btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 32px;
+    max-width: 700px;
+}
+
+.ml-section-label {
+    margin-top: 14px;
+    margin-bottom: 2px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8ba0bd;
+}
+
+.ml-btn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    background: #ffffff;
+    border: 1.5px solid #d0dcea;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    color: #222;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.ml-btn:hover {
+    background: #eef3fa;
+    border-color: #3d6aa3;
+    box-shadow: 0 2px 6px rgba(63, 106, 163, 0.15);
+}
+
+.ml-btn-active {
+    background: #e8f0fb;
+    border-color: #3d6aa3;
+    border-left: 4px solid #3d6aa3;
+    font-weight: 600;
+}
+
+.ml-btn-compare {
+    border-color: #d73027;
+}
+
+.ml-btn-compare:hover,
+.ml-btn-compare.ml-btn-active {
+    background: #fdf2f2;
+    border-color: #d73027;
+    border-left: 4px solid #d73027;
+}
+
+.ml-btn-icon {
+    font-size: 22px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.ml-btn-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ml-btn-text strong {
+    font-size: 14px;
+}
+
+.ml-btn-text small {
+    font-size: 12px;
+    color: #666;
+}
+
+/* Result section */
+.ml-result {
+    border-top: 2px solid #d0dcea;
+    padding-top: 20px;
+}
+
+.ml-result-title {
+    font-size: 20px;
+    margin-bottom: 8px;
+    color: #1f3a5f;
+}
+
+.ml-description {
+    font-size: 13px;
+    color: #444;
+    margin-bottom: 18px;
+    max-width: 760px;
+    line-height: 1.6;
+}
+
+/* Metrics pills */
+.ml-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.metric-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #1f3a5f;
+    color: white;
+    border-radius: 8px;
+    padding: 10px 18px;
+    min-width: 110px;
+}
+
+.metric-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.8;
+    margin-bottom: 4px;
+}
+
+.metric-value {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+/* Chart output */
+.chart-section-title {
+    margin-bottom: 10px;
+    color: #26466f;
+}
+
+.chart-label {
+    font-size: 12px;
+    color: #555;
+    margin: 0 0 6px 0;
+    text-align: center;
+}
+
+/* Placeholder */
+.ml-placeholder {
+    margin-top: 40px;
+    text-align: center;
+    color: #8ba0bd;
+    font-size: 16px;
+}

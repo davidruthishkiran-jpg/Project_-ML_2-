@@ -113,7 +113,25 @@
                 <span class="ml-btn-icon">🔵</span>
                 <span class="ml-btn-text">
                     <strong>K-Means Clustering</strong>
-                    <small>Elbow · silhouette · PCA scatter · profiles</small>
+                    <small>Elbow · silhouette · K-means++ · Mini-Batch</small>
+                </span>
+            </a>
+
+            <a href="{{ url_for('ml_run', algo='hierarchical') }}"
+               class="ml-btn {% if algo == 'hierarchical' %}ml-btn-active{% endif %}">
+                <span class="ml-btn-icon">🌳</span>
+                <span class="ml-btn-text">
+                    <strong>Hierarchical Clustering</strong>
+                    <small>Agglomerative · 4 linkages · dendrograms</small>
+                </span>
+            </a>
+
+            <a href="{{ url_for('ml_run', algo='dbscan') }}"
+               class="ml-btn {% if algo == 'dbscan' %}ml-btn-active{% endif %}">
+                <span class="ml-btn-icon">🔍</span>
+                <span class="ml-btn-text">
+                    <strong>DBSCAN</strong>
+                    <small>ε / minPts sweep · outlier detection</small>
                 </span>
             </a>
 

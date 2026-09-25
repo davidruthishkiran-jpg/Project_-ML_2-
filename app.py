@@ -9,6 +9,8 @@ from ml_models import (
     run_random_forest,
     run_xgboost,
     run_kmeans,
+    run_hierarchical,
+    run_dbscan,
     run_model_comparison,
 )
 
@@ -22,6 +24,8 @@ _ML_RUNNERS = {
     "random_forest":       run_random_forest,
     "xgboost":             run_xgboost,
     "kmeans":              run_kmeans,
+    "hierarchical":        run_hierarchical,
+    "dbscan":              run_dbscan,
     "model_comparison":    run_model_comparison,
 }
 

@@ -632,7 +632,86 @@ def run_kmeans() -> dict:
     _save("km_silhouette.png")
     charts.append("km_silhouette.png")
 
+    # ── Chart 3: K-means++ vs random init — inertia comparison ──────────────
+    # Shows why K-means++ almost always wins: lower final inertia, less variance
+    random_inertias, pp_inertias = [], []
+    N_TRIALS = 8
+    for _ in range(N_TRIALS):
+        seed = rng_seed = np.random.randint(0, 9999)
+        random_inertias.append(
+            KMeans(n_clusters=best_k, init="random", n_init=1,
+                   random_state=seed).fit(X_s).inertia_
+        )
+        pp_inertias.append(
+            KMeans(n_clusters=best_k, init="k-means++", n_init=1,
+                   random_state=seed).fit(X_s).inertia_
+        )
 
+    x = np.arange(N_TRIALS)
+    w = 0.35
+    plt.figure(figsize=(9, 4))
+    plt.bar(x - w/2, random_inertias, w, label="Random init",   color="#d73027", alpha=0.8)
+    plt.bar(x + w/2, pp_inertias,     w, label="K-means++ init", color="#1a9850", alpha=0.8)
+    plt.xticks(x, [f"Run {i+1}" for i in x], fontsize=9)
+    plt.ylabel("Final Inertia (lower = better)")
+    plt.title(f"K-Means++ vs Random Initialisation (K={best_k})\n"
+              "K-means++ spreads seeds intelligently → lower, more stable inertia")
+    plt.legend()
+    plt.grid(axis="y", alpha=0.3)
+    _save("km_pp_vs_random.png")
+    charts.append("km_pp_vs_random.png")
+
+    # ── Chart 4: Mini-Batch K-Means — speed vs quality tradeoff ─────────────
+    from sklearn.cluster import MiniBatchKMeans
+    import time
+
+    batch_sizes  = [32, 64, 128, 256, 512, 1024]
+    mb_inertias, mb_times, mb_sil = [], [], []
+
+    for bs in batch_sizes:
+        t0 = time.perf_counter()
+        mb = MiniBatchKMeans(n_clusters=best_k, batch_size=bs,
+                             random_state=42, n_init=3)
+        mb_labels = mb.fit_predict(X_s)
+        mb_times.append(time.perf_counter() - t0)
+        mb_inertias.append(mb.inertia_)
+        mb_sil.append(silhouette_score(X_s, mb_labels))
+
+    # full K-Means baseline
+    t0 = time.perf_counter()
+    full_km = KMeans(n_clusters=best_k, random_state=42, n_init=10)
+    full_km.fit(X_s)
+    full_time = time.perf_counter() - t0
+    full_inertia = full_km.inertia_
+    full_sil = silhouette_score(X_s, full_km.labels_)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+
+    ax1.plot(batch_sizes, mb_inertias, "o-", color="#3d6aa3", label="Mini-Batch")
+    ax1.axhline(full_inertia, color="#d73027", linestyle="--", lw=1.5,
+                label=f"Full K-Means ({full_inertia:.0f})")
+    ax1.set_xlabel("Batch size")
+    ax1.set_ylabel("Inertia")
+    ax1.set_title("Mini-Batch K-Means — Inertia vs Batch Size")
+    ax1.legend(fontsize=8)
+    ax1.grid(True, alpha=0.3)
+
+    ax2.plot(batch_sizes, mb_sil, "s-", color="#1a9850", label="Mini-Batch")
+    ax2.axhline(full_sil, color="#d73027", linestyle="--", lw=1.5,
+                label=f"Full K-Means ({full_sil:.3f})")
+    ax2.set_xlabel("Batch size")
+    ax2.set_ylabel("Silhouette Score")
+    ax2.set_title("Mini-Batch K-Means — Silhouette vs Batch Size")
+    ax2.legend(fontsize=8)
+    ax2.grid(True, alpha=0.3)
+
+    plt.suptitle(
+        "Mini-Batch K-Means: larger batches approach full K-Means quality\n"
+        "but any batch size is faster on big data",
+        fontsize=10
+    )
+    _save("km_minibatch.png")
+    charts.append("km_minibatch.png")
 
     return {
         "title": "K-Means Clustering",
@@ -642,13 +721,328 @@ def run_kmeans() -> dict:
             "Features used": len(cluster_cols),
             "Best K (silhouette)": best_k,
             "Best Silhouette Score": round(float(max(sil_scores)), 4),
+            "Full K-Means Inertia": round(float(full_inertia), 2),
         },
         "charts": charts,
         "description": (
-            "Trained on <b>unsupervised_placement.csv</b> — a dataset with 4 latent archetypes "
-            "(High-Achiever, Average, Below-Average, Specialist) but <em>no placement label</em>. "
-            f"Silhouette analysis selected K={best_k}. "
-            "The elbow curve shows inertia drop-off and the silhouette score confirms the optimal K."
+            "Trained on <b>unsupervised_placement.csv</b> — 4 latent archetypes, no placement label. "
+            "Chart 1: Elbow method (inertia vs K). "
+            "Chart 2: Silhouette score picks the optimal K. "
+            "Chart 3: K-means++ vs random init across 8 independent runs — "
+            "K-means++ seeds centroids proportional to distance², giving lower and more stable inertia. "
+            "Chart 4: Mini-Batch K-Means trades a small quality drop for speed — "
+            "useful when the dataset is too large to fit in memory."
+        ),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Hierarchical Clustering
+# ══════════════════════════════════════════════════════════════════
+
+def run_hierarchical() -> dict:
+    """
+    Agglomerative hierarchical clustering with all four linkage methods
+    (single, complete, average, Ward) on the unsupervised placement dataset.
+    """
+    from sklearn.metrics import silhouette_score
+    from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
+    from scipy.spatial.distance import pdist
+    from sklearn.cluster import AgglomerativeClustering
+
+    charts = []
+    df = pd.read_csv(UNSUPERVISED)
+
+    cluster_cols = [
+        "CGPA", "AttendancePercent", "AptitudeTestScore",
+        "CodingTestScore", "MockInterviewScore", "SoftSkillsRating",
+        "Internships", "Projects", "Certifications",
+    ]
+    cluster_cols = [c for c in cluster_cols if c in df.columns]
+
+    X = df[cluster_cols].values
+    scaler = StandardScaler()
+    X_s = scaler.fit_transform(X)
+
+    # subsample for dendrogram readability (scipy dendrograms blow up with 2000 pts)
+    DEND_N = 300
+    rng = np.random.default_rng(42)
+    idx = rng.choice(len(X_s), DEND_N, replace=False)
+    X_dend = X_s[idx]
+
+    linkages = ["ward", "complete", "average", "single"]
+    link_colors = {"ward": "#1f3a5f", "complete": "#d73027",
+                   "average": "#1a9850", "single": "#ff7f00"}
+    link_labels = {"ward": "Ward (minimises within-cluster variance)",
+                   "complete": "Complete (max pairwise distance)",
+                   "average": "Average (mean pairwise distance)",
+                   "single": "Single (min pairwise distance — chaining risk)"}
+
+    # ── Chart 1: Four dendrograms side by side ────────────────────────────────
+    fig, axes = plt.subplots(1, 4, figsize=(20, 6))
+    for ax, method in zip(axes, linkages):
+        Z = linkage(X_dend, method=method)
+        dendrogram(Z, ax=ax, no_labels=True,
+                   color_threshold=0.7 * max(Z[:, 2]),
+                   above_threshold_color="#aaaaaa",
+                   leaf_font_size=6)
+        ax.set_title(f"{method.capitalize()} linkage\n{link_labels[method]}",
+                     fontsize=8, pad=6)
+        ax.set_xlabel(f"Students (n={DEND_N} sample)", fontsize=7)
+        ax.set_ylabel("Distance" if method == "ward" else "Dissimilarity", fontsize=7)
+        ax.tick_params(axis="both", labelsize=6)
+    plt.suptitle(
+        "Hierarchical Clustering — Dendrograms (4 linkage strategies)\n"
+        "Horizontal cut = number of clusters; Ward usually gives most balanced trees",
+        fontsize=10, y=1.01
+    )
+    _save("hc_dendrograms.png")
+    charts.append("hc_dendrograms.png")
+
+    # ── Chart 2: Silhouette score per linkage × K ─────────────────────────────
+    K_range = range(2, 8)
+    plt.figure(figsize=(9, 5))
+    best_combo = {"sil": -1}
+
+    for method in linkages:
+        sil_scores = []
+        for k in K_range:
+            model = AgglomerativeClustering(n_clusters=k, linkage=method)
+            labels = model.fit_predict(X_s)
+            s = silhouette_score(X_s, labels)
+            sil_scores.append(s)
+            if s > best_combo["sil"]:
+                best_combo = {"sil": s, "method": method, "k": k}
+        plt.plot(list(K_range), sil_scores, "o-",
+                 color=link_colors[method], lw=2, label=method.capitalize())
+
+    plt.xlabel("Number of clusters K")
+    plt.ylabel("Silhouette Score")
+    plt.title("Hierarchical Clustering — Silhouette Score per Linkage × K\n"
+              "(Ward generally dominates on Euclidean-space data)")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    _save("hc_silhouette_comparison.png")
+    charts.append("hc_silhouette_comparison.png")
+
+    # ── Chart 3: Ward cophenetic distances (how tall each merge is) ───────────
+    Z_ward = linkage(X_dend, method="ward")
+    merge_heights = Z_ward[:, 2]
+    last_merges = merge_heights[-20:][::-1]          # top-20 merges
+
+    plt.figure(figsize=(9, 4))
+    plt.bar(range(1, len(last_merges) + 1), last_merges,
+            color="#1f3a5f", alpha=0.85, edgecolor="white")
+    diffs = np.diff(last_merges[::-1])[::-1]
+    biggest_gap_idx = int(np.argmax(diffs)) + 1      # +1 → cut above this merge
+    suggested_k = biggest_gap_idx + 1
+    plt.axvline(biggest_gap_idx + 0.5, color="#d73027", linestyle="--",
+                lw=2, label=f"Biggest gap → K={suggested_k}")
+    plt.xlabel("Merge step (last 20, 1 = most recent)")
+    plt.ylabel("Merge height (Ward distance)")
+    plt.title("Ward Linkage — Last 20 Merge Heights\n"
+              "Big gap between consecutive merges signals natural number of clusters")
+    plt.legend()
+    plt.grid(axis="y", alpha=0.3)
+    _save("hc_ward_merge_heights.png")
+    charts.append("hc_ward_merge_heights.png")
+
+    return {
+        "title": "Hierarchical Clustering",
+        "metrics": {
+            "Dataset": "unsupervised_placement.csv",
+            "Samples": len(df),
+            "Best linkage": best_combo["method"].capitalize(),
+            "Best K": best_combo["k"],
+            "Best Silhouette": round(best_combo["sil"], 4),
+            "Ward gap suggests K": suggested_k,
+        },
+        "charts": charts,
+        "description": (
+            "Agglomerative (bottom-up) hierarchical clustering merges the two closest clusters "
+            "at every step. <b>Ward</b> minimises within-cluster variance and usually gives the "
+            "most balanced trees. <b>Single</b> linkage is vulnerable to chaining — one stray "
+            "point can join two large clusters. Chart 1 shows all four dendrograms; "
+            "Chart 2 compares silhouette scores across linkages and K values; "
+            "Chart 3 reads the Ward merge-height plot — a large gap between consecutive merges "
+            "is the dendrogram equivalent of the elbow method."
+        ),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
+#  DBSCAN
+# ══════════════════════════════════════════════════════════════════
+
+def run_dbscan() -> dict:
+    """
+    Density-Based Spatial Clustering of Applications with Noise.
+    Shows eps/minPts sensitivity, outlier detection, and why DBSCAN
+    handles non-convex clusters that K-Means misses.
+    """
+    from sklearn.cluster import DBSCAN
+    from sklearn.metrics import silhouette_score
+    from sklearn.neighbors import NearestNeighbors
+
+    charts = []
+    df = pd.read_csv(UNSUPERVISED)
+
+    cluster_cols = [
+        "CGPA", "AttendancePercent", "AptitudeTestScore",
+        "CodingTestScore", "MockInterviewScore", "SoftSkillsRating",
+    ]
+    cluster_cols = [c for c in cluster_cols if c in df.columns]
+
+    X = df[cluster_cols].values
+    scaler = StandardScaler()
+    X_s = scaler.fit_transform(X)
+
+    # ── Chart 1: k-distance plot to guide eps choice ──────────────────────────
+    # Standard heuristic: fit k-NN with k = minPts, sort distances, look for elbow
+    MIN_PTS = 5
+    nbrs = NearestNeighbors(n_neighbors=MIN_PTS).fit(X_s)
+    distances, _ = nbrs.kneighbors(X_s)
+    k_dist = np.sort(distances[:, -1])[::-1]
+
+    plt.figure(figsize=(8, 4))
+    plt.plot(k_dist, color="#1f3a5f", lw=1.5)
+    # rough elbow: biggest second-derivative
+    smooth = np.convolve(k_dist, np.ones(20)/20, mode="valid")
+    d2 = np.diff(np.diff(smooth))
+    elbow_idx = int(np.argmax(d2)) + 20
+    elbow_eps  = float(k_dist[elbow_idx])
+    plt.axvline(elbow_idx, color="#d73027", linestyle="--", lw=1.5,
+                label=f"Elbow ≈ ε={elbow_eps:.2f}")
+    plt.xlabel("Points sorted by k-distance (descending)")
+    plt.ylabel(f"{MIN_PTS}-NN distance")
+    plt.title(f"k-Distance Plot (k=minPts={MIN_PTS})\n"
+              "The 'elbow' gives a good starting ε for DBSCAN")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    _save("dbscan_kdist.png")
+    charts.append("dbscan_kdist.png")
+
+    # ── Chart 2: eps sweep — clusters found, noise points, silhouette ─────────
+    eps_values = np.round(np.linspace(0.3, 2.0, 14), 2)
+    n_clusters_list, n_noise_list, sil_list = [], [], []
+
+    for eps in eps_values:
+        db = DBSCAN(eps=eps, min_samples=MIN_PTS).fit(X_s)
+        labels = db.labels_
+        nc = len(set(labels)) - (1 if -1 in labels else 0)
+        nn = int(np.sum(labels == -1))
+        n_clusters_list.append(nc)
+        n_noise_list.append(nn)
+        if nc >= 2 and nc < len(X_s) - 1:
+            mask = labels != -1
+            if mask.sum() > nc:
+                sil_list.append(silhouette_score(X_s[mask], labels[mask]))
+            else:
+                sil_list.append(np.nan)
+        else:
+            sil_list.append(np.nan)
+
+    fig, axes = plt.subplots(3, 1, figsize=(9, 9), sharex=True)
+
+    axes[0].plot(eps_values, n_clusters_list, "o-", color="#3d6aa3", lw=2)
+    axes[0].set_ylabel("Number of clusters found")
+    axes[0].set_title(f"DBSCAN Parameter Sweep — ε (minPts={MIN_PTS})")
+    axes[0].grid(True, alpha=0.3)
+    axes[0].axvline(elbow_eps, color="#d73027", linestyle="--", lw=1,
+                    label=f"Elbow ε≈{elbow_eps:.2f}")
+    axes[0].legend(fontsize=8)
+
+    axes[1].bar(eps_values, n_noise_list, width=0.1,
+                color="#d73027", alpha=0.8, label="Noise points")
+    axes[1].set_ylabel("Noise / Outlier count")
+    axes[1].grid(axis="y", alpha=0.3)
+    axes[1].legend(fontsize=8)
+
+    sil_clean = [s if not np.isnan(s) else None for s in sil_list]
+    axes[2].plot(eps_values, sil_list, "s-", color="#1a9850", lw=2)
+    axes[2].set_ylabel("Silhouette Score\n(core points only)")
+    axes[2].set_xlabel("ε (epsilon)")
+    axes[2].grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    _save("dbscan_eps_sweep.png")
+    charts.append("dbscan_eps_sweep.png")
+
+    # ── Chart 3: minPts sweep at fixed eps ───────────────────────────────────
+    minpts_values = [2, 3, 4, 5, 8, 10, 15, 20]
+    mp_clusters, mp_noise = [], []
+
+    for mp in minpts_values:
+        db = DBSCAN(eps=elbow_eps, min_samples=mp).fit(X_s)
+        labels = db.labels_
+        mp_clusters.append(len(set(labels)) - (1 if -1 in labels else 0))
+        mp_noise.append(int(np.sum(labels == -1)))
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
+    ax1.plot(minpts_values, mp_clusters, "o-", color="#3d6aa3", lw=2)
+    ax1.set_xlabel("minPts")
+    ax1.set_ylabel("Clusters found")
+    ax1.set_title(f"minPts Sweep (ε={elbow_eps:.2f})\nClusters")
+    ax1.grid(True, alpha=0.3)
+
+    ax2.bar(minpts_values, mp_noise, color="#d73027", alpha=0.8, width=1.2)
+    ax2.set_xlabel("minPts")
+    ax2.set_ylabel("Noise / Outlier points")
+    ax2.set_title(f"minPts Sweep (ε={elbow_eps:.2f})\nNoise points (naturally identified outliers)")
+    ax2.grid(axis="y", alpha=0.3)
+
+    plt.suptitle("DBSCAN — minPts sensitivity\n"
+                 "Higher minPts = stricter density requirement → more outliers",
+                 fontsize=10)
+    _save("dbscan_minpts_sweep.png")
+    charts.append("dbscan_minpts_sweep.png")
+
+    # ── Best run ──────────────────────────────────────────────────────────────
+    best_db = DBSCAN(eps=elbow_eps, min_samples=MIN_PTS).fit(X_s)
+    best_labels = best_db.labels_
+    n_clusters_best = len(set(best_labels)) - (1 if -1 in best_labels else 0)
+    n_noise_best = int(np.sum(best_labels == -1))
+
+    # ── Chart 4: Outlier fraction per original archetype ─────────────────────
+    df_tmp = df.copy()
+    df_tmp["dbscan_label"] = best_labels
+    df_tmp["is_outlier"] = (best_labels == -1).astype(int)
+
+    arch_outlier = df_tmp.groupby("Archetype")["is_outlier"].mean().sort_values(ascending=False)
+
+    plt.figure(figsize=(7, 4))
+    arch_outlier.plot(kind="bar", color=["#d73027","#ff7f00","#3d6aa3","#1a9850"][:len(arch_outlier)],
+                      edgecolor="white")
+    plt.ylabel("Fraction flagged as outlier / noise")
+    plt.xlabel("Student Archetype")
+    plt.title(f"DBSCAN (ε={elbow_eps:.2f}, minPts={MIN_PTS}) — Outlier Rate per Archetype\n"
+              "DBSCAN naturally surfaces low-density students as noise")
+    plt.xticks(rotation=15, ha="right")
+    plt.ylim(0, 1)
+    plt.grid(axis="y", alpha=0.3)
+    _save("dbscan_outlier_by_archetype.png")
+    charts.append("dbscan_outlier_by_archetype.png")
+
+    return {
+        "title": "DBSCAN",
+        "metrics": {
+            "Dataset": "unsupervised_placement.csv",
+            "ε (auto from elbow)": round(elbow_eps, 2),
+            "minPts": MIN_PTS,
+            "Clusters found": n_clusters_best,
+            "Outliers / Noise": n_noise_best,
+            "Outlier %": round(n_noise_best / len(df) * 100, 1),
+        },
+        "charts": charts,
+        "description": (
+            "DBSCAN groups points that are within ε of each other with at least minPts neighbours "
+            "(core points). Points unreachable from any core point are labelled <b>−1 (noise / outlier)</b> — "
+            "no assignment forced. "
+            "Chart 1: k-distance plot finds the elbow ε automatically. "
+            "Chart 2: ε sweep shows how cluster count and noise fraction change. "
+            "Chart 3: minPts sweep — stricter density = more outliers. "
+            "Chart 4: outlier rate per archetype confirms DBSCAN naturally exposes "
+            "sparse / atypical students as noise."
         ),
     }
 
